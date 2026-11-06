@@ -14745,7 +14745,8 @@ namespace tsl {
                                 // HUD overlays may release foreground to the game, but still need
                                 // their configured combo to close the overlay and stop workers.
                                 tsl::setNextOverlay(returnOverlayPath);
-                                launchComboHasTriggered.store(true, std::memory_order_release);
+                                fireLaunch();
+                                return;
                             }
                         }
                         else {
