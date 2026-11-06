@@ -37,6 +37,7 @@ constexpr size_t kRespCap   = 192 * 1024;
 constexpr size_t kStackSize = 256 * 1024;
 constexpr u64    kPollNs    = 2500ULL * 1000000ULL;     // how often the screen is checked
 constexpr u64    kRetryNs   = 1200ULL * 1000000ULL;     // re-check while the picture is still moving
+constexpr u64    kErrorCooldownNs = 30000000000ULL;          // slow down after exhausting retries
 constexpr int    kMaxRetries = 2;
 constexpr u64    kRetryDelayNs[2] = {5000000000ULL, 15000000000ULL};
 constexpr int    kLayerW = 640;      // capture px -> layer px is /2
@@ -494,6 +495,7 @@ void worker(void*) {
                 setStatus("%s", err.c_str());
                 if (!retryable) break; // invalid key, permission error or rate limit: stop contacting this provider
                 memcpy(thumbOcr, thumbNow, sizeof(thumbNow)); haveOcr = true;
+                wait = kErrorCooldownNs;
                 continue;
             }
             ocrKeyAccepted = g_set.useVision ? !g_set.visionKey.empty() : !g_set.ocrSpaceKey.empty();
@@ -540,6 +542,7 @@ void worker(void*) {
                     setStatus("%s", err.c_str());
                     if (!retryable) break; // invalid key, permission error or rate limit: stop contacting this provider
                     memcpy(thumbOcr, thumbNow, sizeof(thumbNow)); haveOcr = true;
+                    wait = kErrorCooldownNs;
                     continue;
                 }
                 translationKeyAccepted = g_set.translateProvider == TranslateProvider::DeepL
