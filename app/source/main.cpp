@@ -8,9 +8,11 @@
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
 #include "config.hpp"
+#ifndef TNX_NRO_LITE
 #include "logo_data.h"
 #include "qr_data.h"
 #include "help_texts.h"
+#endif
 
 // -------------------------------------------------------
 // DIL KODLARI & ISIMLERI (UTF-8)
@@ -37,21 +39,23 @@ static std::map<std::string,std::map<std::string,std::string>> T;
 
 static void initT() {
     T["TR"]={{"k0",u8"API Anahtarları"},{"k1",u8"Dil Ayarları"},{"k2",u8"Rehber & Yardım"}, {"k3",u8"İletişim"},
-              {"c_title", u8"Tüm linkler"}, {"c_desc", u8"Yapımcı ile iletişim kurmak ve linklerine ulaşmak için\naşağıdaki QR kodu okutabilirsiniz."},
+              {"c_title", u8"Tüm linkler"}, {"c_desc", u8"Yapımcı ile iletişim ve sosyal bağlantılar."},
               {"ocr",u8"OCR Servisleri"},{"tr2",u8"Çeviri Servisleri"},
               {"emp",u8"(Boş) - düzenlemek için [A]"},{"uil",u8"Arayüz Dili"},
               {"ft",u8"[A] Seç   [L/R] Menü Geçişi   [Yukarı/Aşağı] Kaydır   [+] Çıkış"}};
               
     T["EN"]={{"k0",u8"API Keys"},{"k1",u8"Language Settings"},{"k2",u8"Guide & Help"}, {"k3",u8"Contact"},
-              {"c_title", u8"All Links"}, {"c_desc", u8"You can scan the QR code below to contact the developer\nand access their links."},
+              {"c_title", u8"All Links"}, {"c_desc", u8"Developer contact and social links."},
               {"ocr",u8"OCR Services"},{"tr2",u8"Translation Services"},
               {"emp",u8"(Empty) - press [A] to edit"},{"uil",u8"UI Language"},
               {"ft",u8"[A] Select   [L/R] Menu Tab   [Up/Down] Scroll   [+] Exit"}};
 
+#ifndef TNX_NRO_LITE
     initHelpTexts();
     for (auto& pair : HELP_TEXTS) {
         T[pair.first]["hlp"] = pair.second;
     }
+#endif
 }
 
 static const char* Tr(const char* k, const std::string& lang) {
@@ -145,6 +149,7 @@ int main(int argc, char* argv[]) {
     int uiIdx=1;
     for(int i=0;i<NUM_LANGS;i++) if(cfg.uiLang==LC[i]){uiIdx=i;break;}
 
+#ifndef TNX_NRO_LITE
     SDL_Surface* lsurf=SDL_CreateRGBSurfaceWithFormatFrom(
         (void*)logo_pixels,logo_width,logo_height,32,logo_width*4,SDL_PIXELFORMAT_RGBA32);
     SDL_Texture* logoTex=nullptr;
@@ -154,6 +159,7 @@ int main(int argc, char* argv[]) {
         (void*)qr_pixels,qr_width,qr_height,32,qr_width*4,SDL_PIXELFORMAT_RGBA32);
     SDL_Texture* qrTex=nullptr;
     if(qrsurf){qrTex=SDL_CreateTextureFromSurface(ren,qrsurf);SDL_FreeSurface(qrsurf);}
+#endif
 
 
     const float W=1280,H=720;
@@ -287,12 +293,14 @@ int main(int argc, char* argv[]) {
             dl->AddRectFilled({0,0},{SBW,H},IM_COL32(10,10,14,255));
             dl->AddLine({SBW,0},{SBW,H},IM_COL32(30,30,44,255),1.5f);
 
+            float ty=24;
+#ifndef TNX_NRO_LITE
             float lw=220, lh=lw*((float)logo_height/logo_width);
             float lx=(SBW-lw)/2.0f, ly=24;
             if(logoTex) dl->AddImage((ImTextureID)logoTex,{lx,ly},{lx+lw,ly+lh});
-
+            ty=ly+lh+24;
+#endif
             const char* tnames[]={Tr("k0",cfg.uiLang),Tr("k1",cfg.uiLang),Tr("k2",cfg.uiLang),Tr("k3",cfg.uiLang)};
-            float ty=ly+lh+24;
             for(int i=0;i<4;i++){
                 float tx=10,tw=SBW-20,th=42;
                 if(tab==i) dl->AddRectFilled({tx,ty},{tx+tw,ty+th},IM_COL32(35,82,168,255),6.f);
@@ -443,6 +451,7 @@ int main(int argc, char* argv[]) {
             ImGui::SetCursorPosX(cx);
             ImGui::Separator();
             
+#ifndef TNX_NRO_LITE
             // Yardim metni cok uzun oldugu icin BeginChild kullaniyoruz!
             ImGui::BeginChild("##HelpChild", {cw, CTH-110}, true, ImGuiWindowFlags_NoNav);
             
@@ -475,6 +484,9 @@ int main(int argc, char* argv[]) {
             }
             
             ImGui::EndChild();
+#else
+            ImGui::TextDisabled("Help content is not included in this compact NRO build.");
+#endif
         }
 
         
@@ -513,12 +525,14 @@ int main(int argc, char* argv[]) {
             
             ImGui::Spacing(); ImGui::Spacing();
             
+#ifndef TNX_NRO_LITE
             if (qrTex) {
                 float qr_w = 200.0f;
                 float qr_h = 200.0f;
                 ImGui::SetCursorPosX((cw - qr_w) * 0.5f);
                 ImGui::Image((ImTextureID)qrTex, {qr_w, qr_h});
             }
+#endif
             
             ImGui::Spacing(); ImGui::Spacing(); ImGui::Spacing();
             
@@ -561,8 +575,10 @@ int main(int argc, char* argv[]) {
         SDL_RenderPresent(ren);
     }
 
+#ifndef TNX_NRO_LITE
     if(logoTex) SDL_DestroyTexture(logoTex);
     if(qrTex) SDL_DestroyTexture(qrTex);
+#endif
     ImGui_ImplSDLRenderer2_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
