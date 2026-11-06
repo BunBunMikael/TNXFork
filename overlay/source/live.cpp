@@ -249,6 +249,15 @@ int getMyMemory(const std::string& text, std::string& translated) {
 
     cJSON* root = cJSON_Parse(g_resp);
     if (!root) return status;
+    const cJSON* apiStatus = cJSON_GetObjectItemCaseSensitive(root, "responseStatus");
+    int providerStatus = 200;
+    if (cJSON_IsNumber(apiStatus)) providerStatus = (int)apiStatus->valuedouble;
+    else if (cJSON_IsString(apiStatus) && apiStatus->valuestring)
+        providerStatus = (int)strtol(apiStatus->valuestring, nullptr, 10);
+    if (providerStatus != 200) {
+                cJSON_Delete(root);
+        return providerStatus > 0 ? providerStatus : 502;
+    }
     const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "responseData");
     const cJSON* value = data ? cJSON_GetObjectItemCaseSensitive(data, "translatedText") : nullptr;
     if (cJSON_IsString(value) && value->valuestring) translated = value->valuestring;
