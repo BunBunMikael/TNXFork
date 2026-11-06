@@ -176,12 +176,22 @@ bool parseOcrSpaceWords(const char* json, std::vector<Word>& out, std::string& e
         const cJSON* m0 = cJSON_IsArray(m) ? cJSON_GetArrayItem(m, 0) : m;
         err = cJSON_IsString(m0) ? m0->valuestring : "OCR.space error";
     } else {
-        ok = true;
+        const cJSON* exitCode = cJSON_GetObjectItemCaseSensitive(root, "OCRExitCode");
+        const int code = cJSON_IsNumber(exitCode) ? (int)exitCode->valuedouble : 0;
         const cJSON* pr = cJSON_GetObjectItemCaseSensitive(root, "ParsedResults");
+        if (code >= 3 || !cJSON_IsArray(pr) || cJSON_GetArraySize(pr) == 0) {
+            const cJSON* m = cJSON_GetObjectItemCaseSensitive(root, "ErrorMessage");
+            const cJSON* m0 = cJSON_IsArray(m) ? cJSON_GetArrayItem(m, 0) : m;
+            if (!cJSON_IsString(m0))
+                m0 = cJSON_GetObjectItemCaseSensitive(root, "ErrorDetails");
+            err = cJSON_IsString(m0) ? m0->valuestring : "OCR.space returned no parsed result";
+        } else {
+            ok = true;
+        }
         const cJSON* p0 = cJSON_IsArray(pr) ? cJSON_GetArrayItem(pr, 0) : nullptr;
         const cJSON* ov = p0 ? cJSON_GetObjectItemCaseSensitive(p0, "TextOverlay") : nullptr;
         const cJSON* lines = ov ? cJSON_GetObjectItemCaseSensitive(ov, "Lines") : nullptr;
-        const int ln = cJSON_IsArray(lines) ? cJSON_GetArraySize(lines) : 0;
+        const int ln = ok && cJSON_IsArray(lines) ? cJSON_GetArraySize(lines) : 0;
         for (int i = 0; i < ln; ++i) {
             const cJSON* words = cJSON_GetObjectItemCaseSensitive(cJSON_GetArrayItem(lines, i), "Words");
             const int wn = cJSON_IsArray(words) ? cJSON_GetArraySize(words) : 0;
