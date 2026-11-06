@@ -39,13 +39,23 @@ static std::map<std::string,std::map<std::string,std::string>> T;
 
 static void initT() {
     T["TR"]={{"k0",u8"API Anahtarları"},{"k1",u8"Dil Ayarları"},{"k2",u8"Rehber & Yardım"}, {"k3",u8"İletişim"},
-              {"c_title", u8"Tüm linkler"}, {"c_desc", u8"Yapımcı ile iletişim ve sosyal bağlantılar."},
+              {"c_title", u8"Tüm linkler"},
+#ifndef TNX_NRO_LITE
+              {"c_desc", u8"Yapımcı ile iletişim kurmak ve linklerine ulaşmak için\naşağıdaki QR kodu okutabilirsiniz."},
+#else
+              {"c_desc", u8"Yapımcı ile iletişim ve sosyal bağlantılar."},
+#endif
               {"ocr",u8"OCR Servisleri"},{"tr2",u8"Çeviri Servisleri"},
               {"emp",u8"(Boş) - düzenlemek için [A]"},{"uil",u8"Arayüz Dili"},
               {"ft",u8"[A] Seç   [L/R] Menü Geçişi   [Yukarı/Aşağı] Kaydır   [+] Çıkış"}};
               
     T["EN"]={{"k0",u8"API Keys"},{"k1",u8"Language Settings"},{"k2",u8"Guide & Help"}, {"k3",u8"Contact"},
-              {"c_title", u8"All Links"}, {"c_desc", u8"Developer contact and social links."},
+              {"c_title", u8"All Links"},
+#ifndef TNX_NRO_LITE
+              {"c_desc", u8"You can scan the QR code below to contact the developer\nand access their links."},
+#else
+              {"c_desc", u8"Developer contact and social links."},
+#endif
               {"ocr",u8"OCR Services"},{"tr2",u8"Translation Services"},
               {"emp",u8"(Empty) - press [A] to edit"},{"uil",u8"UI Language"},
               {"ft",u8"[A] Select   [L/R] Menu Tab   [Up/Down] Scroll   [+] Exit"}};
