@@ -240,7 +240,7 @@ std::string urlEncode(const std::string& input) {
     return out;
 }
 
-int getMyMemory(const std::string& text, std::string& translated, std::string& err) {}
+int getMyMemory(const std::string& text, std::string& translated, std::string& err) {
     std::string lang = g_set.targetLang.empty() ? "en" : g_set.targetLang;
     std::string url = "https://api.mymemory.translated.net/get?q=" + urlEncode(text) +
                       "&langpair=ja%7C" + urlEncode(lang);
@@ -446,7 +446,9 @@ int runTranslate(const std::vector<std::string>& texts, std::vector<std::string>
             if (st < 200 || st >= 300) {
                 retryable = retryableHttp(st);
                 if (st == 0) err = "Translate: network error - " + curlFailureText();
-                else if (st == 429) err = "Translate: MyMemory HTTP 429 - rate limit or quota reached";
+                else if (st == 429)
+                    err = "Translate: MyMemory HTTP 429 - rate limit or quota reached" +
+                          (err.empty() ? "" : " - " + err);
                 else if (st < 200 || st >= 300)
                     err = "Translate: MyMemory HTTP " + std::to_string(st) + (err.empty() ? "" : " - " + err);
                 return 1;
