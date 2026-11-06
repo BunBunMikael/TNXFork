@@ -1192,6 +1192,8 @@ public:
     void initServices() override {
 #ifndef TNX_HUD
         HttpClient::init();   // the Live HUD opens its own (smaller) sockets in its worker thread
+#else
+        tsl::closeOnLaunchCombo.store(true, std::memory_order_release);
 #endif
         g_config = ConfigManager::load();
     }
@@ -1200,6 +1202,7 @@ public:
 #ifndef TNX_HUD
         HttpClient::cleanup();
 #else
+        tsl::closeOnLaunchCombo.store(false, std::memory_order_release);
         Live::stop();   // safety net: whatever way the overlay ends, the worker and its buffers go with it
 #endif
     }
