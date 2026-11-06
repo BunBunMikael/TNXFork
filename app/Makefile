@@ -47,6 +47,12 @@ ROMFS		:=
 APP_TITLE   := TranslateNX
 APP_AUTHOR  := SertAy
 
+# Build a compact NRO by default. Set NRO_LITE=0 to retain the full UI assets/help.
+NRO_LITE ?= 1
+ifeq ($(NRO_LITE),1)
+DEFINES += -DTNX_NRO_LITE
+endif
+
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
@@ -89,6 +95,10 @@ export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
 CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
+
+ifeq ($(NRO_LITE),1)
+CPPFILES := $(filter-out help_texts.cpp,$(CPPFILES))
+endif
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 
