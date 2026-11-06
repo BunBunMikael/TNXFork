@@ -1143,7 +1143,8 @@ public:
                 r->drawString(values[i], false, 207, y + 12, 9, tsl::Color(12, 14, 15, 15));
             }
             r->drawString(m_status, false, 207, 285, 8, tsl::Color(13, 13, 9, 15));
-            r->drawString("UP/DOWN  A  B", false, 207, 312, 8, tsl::Color(10, 10, 10, 15));
+            r->drawString("Keys checked individually when used", false, 207, 302, 8, tsl::Color(10, 10, 10, 15));
+            r->drawString("UP/DOWN  A  B", false, 207, 317, 8, tsl::Color(10, 10, 10, 15));
         });
         drawer->setBoundaries(0, 0, 640, 360);
         return drawer;
