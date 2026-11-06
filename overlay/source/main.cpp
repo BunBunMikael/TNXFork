@@ -1057,7 +1057,8 @@ class TranslateHudGui : public tsl::Gui {
         // Status: always with live_debug=1, otherwise for a few seconds and whenever something is wrong.
         const char* st = m_snap.status;
         const bool problem = !strncmp(st, "OCR:", 4) || !strncmp(st, "Translate:", 10) ||
-                             !strncmp(st, "Capture", 7) || !strncmp(st, "Network", 7);
+                             !strncmp(st, "Capture", 7) || !strncmp(st, "Network", 7) ||
+                             !strncmp(st, "OCR failed", 10) || !strncmp(st, "Translation failed", 18);
         if (st[0] && (g_config.liveDebug || problem || elapsedMs < 8000)) {
             r->drawRect(4, 342, 300, 14, tsl::Color(0, 0, 0, 11));
             r->drawString(st, false, 8, 352, 9, tsl::Color(problem ? 15 : 12, problem ? 8 : 12, problem ? 8 : 12, 15));
