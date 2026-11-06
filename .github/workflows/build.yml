@@ -46,6 +46,18 @@ jobs:
         working-directory: app
         run: make -j"$(nproc)"
 
+      # Package the repository's original Mozilla CA bundle under the filename
+      # both the Live HUD and settings overlay look for on the Switch SD card.
+      - name: Prepare Live CA certificate
+        run: cp overlay/translate_cacert.pem cacert_live.pem
+
+      - name: Upload CA certificate bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: translate_cacert
+          path: cacert_live.pem
+          if-no-files-found: error
+
       - name: Upload translatenx_live.ovl
         uses: actions/upload-artifact@v4
         with:
