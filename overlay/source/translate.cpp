@@ -124,8 +124,11 @@ TranslateResult runDeepL(const std::vector<std::string>& lines,
 
     HttpResponse resp;
     for (int retry = 0; retry < 3; retry++) {
+        const bool freePlan = apiKey.size() >= 3 &&
+            apiKey.compare(apiKey.size() - 3, 3, ":fx") == 0;
         resp = HttpClient::post(
-            "https://api-free.deepl.com/v2/translate",
+            freePlan ? "https://api-free.deepl.com/v2/translate"
+                     : "https://api.deepl.com/v2/translate",
             body,
             {
                 "Authorization: DeepL-Auth-Key " + apiKey,

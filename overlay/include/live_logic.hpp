@@ -24,8 +24,8 @@ bool parseVisionWords(const char* json, std::vector<Word>& out, std::string& err
 bool parseOcrSpaceWords(const char* json, std::vector<Word>& out, std::string& err);
 
 // Translation request bodies / response parsers (JSON, no URL encoding needed).
-std::string buildDeepLBody(const std::vector<std::string>& texts);
-std::string buildGoogleTranslateBody(const std::vector<std::string>& texts);
+std::string buildDeepLBody(const std::vector<std::string>& texts, const std::string& targetLang = "en");
+std::string buildGoogleTranslateBody(const std::vector<std::string>& texts, const std::string& targetLang = "en");
 bool parseDeepL(const char* json, std::vector<std::string>& out);
 bool parseGoogleTranslate(const char* json, std::vector<std::string>& out);
 

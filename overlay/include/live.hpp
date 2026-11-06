@@ -22,10 +22,13 @@ struct Snapshot {
     char     status[96] = {0};
 };
 
+enum class TranslateProvider { MyMemory, DeepL, GoogleCloud };
+
 struct Settings {
-    bool        useVision    = true;     // false = OCR.space
-    bool        useDeepL     = true;     // false = Google Cloud Translation
-    bool        debug        = false;    // show heap usage in the status line
+    bool        useVision = true;       // false = OCR.space
+    bool        debug = false;          // show heap usage in the status line
+    TranslateProvider translateProvider = TranslateProvider::DeepL;
+    std::string targetLang = "en";
     std::string ocrSpaceKey, visionKey, deeplKey, googleKey;
 };
 

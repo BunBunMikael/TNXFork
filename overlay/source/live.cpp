@@ -13,6 +13,7 @@
 
 #include <switch.h>
 #include <curl/curl.h>
+#include <cJSON.h>
 #include <malloc.h>
 #include <setjmp.h>
 #include <stdio.h>
@@ -54,6 +55,8 @@ size_t            g_jpegLen = 0;
 char*             g_resp = nullptr;
 size_t            g_respLen = 0;
 bool              g_verifyTls = false;
+CURLcode          g_lastCurlResult = CURLE_OK;
+char              g_curlError[CURL_ERROR_SIZE] = {0};
 
 struct CacheEntry { uint64_t h = 0; char text[kTextMax] = {0}; };
 CacheEntry g_cache[kCacheSize];
@@ -187,6 +190,7 @@ int perform(CURL* h, curl_slist* headers, curl_mime* mime) {
             if (m->msg == CURLMSG_DONE) result = m->data.result;
     }
     curl_multi_remove_handle(g_multi, h);
+    g_lastCurlResult = result;
     if (cancelled) status = -1;
     else if (result != CURLE_OK) status = 0;
     else { long code = 0; curl_easy_getinfo(h, CURLINFO_RESPONSE_CODE, &code); status = (int)code; }
@@ -203,6 +207,8 @@ void prepare(CURL* h, const char* url) {
     curl_easy_setopt(h, CURLOPT_BUFFERSIZE, 16384L);
     curl_easy_setopt(h, CURLOPT_UPLOAD_BUFFERSIZE, 16384L);
     curl_easy_setopt(h, CURLOPT_USERAGENT, "TranslateNX-Live");
+    memset(g_curlError, 0, sizeof(g_curlError));
+    curl_easy_setopt(h, CURLOPT_ERRORBUFFER, g_curlError);
     if (g_verifyTls) {
         curl_easy_setopt(h, CURLOPT_CAINFO, kCaPath);
         curl_easy_setopt(h, CURLOPT_SSL_VERIFYPEER, 1L);
@@ -211,6 +217,46 @@ void prepare(CURL* h, const char* url) {
         curl_easy_setopt(h, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(h, CURLOPT_SSL_VERIFYHOST, 0L);
     }
+}
+
+
+std::string urlEncode(const std::string& input) {
+    static const char* hex = "0123456789ABCDEF";
+    std::string out;
+    out.reserve(input.size() * 3);
+    for (unsigned char c : input) {
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~') {
+            out += (char)c;
+        } else {
+            out += '%';
+            out += hex[c >> 4];
+            out += hex[c & 0x0F];
+        }
+    }
+    return out;
+}
+
+int getMyMemory(const std::string& text, std::string& translated) {
+    std::string lang = g_set.targetLang.empty() ? "en" : g_set.targetLang;
+    std::string url = "https://api.mymemory.translated.net/get?q=" + urlEncode(text) +
+                      "&langpair=ja%7C" + urlEncode(lang);
+    prepare(g_easy, url.c_str());
+    const int status = perform(g_easy, nullptr, nullptr);
+    if (status < 200 || status >= 300) return status;
+
+    cJSON* root = cJSON_Parse(g_resp);
+    if (!root) return status;
+    const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "responseData");
+    const cJSON* value = data ? cJSON_GetObjectItemCaseSensitive(data, "translatedText") : nullptr;
+    if (cJSON_IsString(value) && value->valuestring) translated = value->valuestring;
+    cJSON_Delete(root);
+    return status;
+}
+
+std::string curlFailureText() {
+    if (g_curlError[0]) return g_curlError;
+    return curl_easy_strerror(g_lastCurlResult);
 }
 
 int postJson(const char* url, const std::string& keyHeader, const std::string& body) {
@@ -319,8 +365,9 @@ int runOcr(std::vector<Word>& words, std::string& err) {
     const int st = g_set.useVision ? postVision() : postOcrSpace();
     if (st == -1) return 2;
     if (st < 200 || st >= 300) {
-        char b[64]; snprintf(b, sizeof(b), st == 0 ? "OCR: no connection" : "OCR: HTTP %d", st);
-        err = b; return 1;
+        if (st == 0) err = "OCR: network error - " + curlFailureText();
+        else err = "OCR: HTTP " + std::to_string(st);
+        return 1;
     }
     const bool ok = g_set.useVision ? parseVisionWords(g_resp, words, err)
                                     : parseOcrSpaceWords(g_resp, words, err);
@@ -329,21 +376,45 @@ int runOcr(std::vector<Word>& words, std::string& err) {
 }
 
 int runTranslate(const std::vector<std::string>& texts, std::vector<std::string>& out, std::string& err) {
+    if (g_set.translateProvider == TranslateProvider::MyMemory) {
+        // MyMemory accepts one short query per request; keeping each OCR block separate
+        // preserves the HUD's one-translation-per-patch layout.
+        for (const auto& text : texts) {
+            if (g_abort.load(std::memory_order_acquire)) return 2;
+            std::string translated;
+            const int st = getMyMemory(text, translated);
+            if (st == -1) return 2;
+            if (st < 200 || st >= 300) {
+                err = st == 0 ? "Translate: network error - " + curlFailureText()
+                              : "Translate: MyMemory HTTP " + std::to_string(st);
+                return 1;
+            }
+            if (translated.empty()) { err = "Translate: MyMemory returned empty text"; return 1; }
+            out.push_back(std::move(translated));
+        }
+        return 0;
+    }
+
     int st;
-    if (g_set.useDeepL) {
-        const bool freePlan = g_set.deeplKey.size() >= 3 && g_set.deeplKey.compare(g_set.deeplKey.size() - 3, 3, ":fx") == 0;
+    if (g_set.translateProvider == TranslateProvider::DeepL) {
+        const bool freePlan = g_set.deeplKey.size() >= 3 &&
+            g_set.deeplKey.compare(g_set.deeplKey.size() - 3, 3, ":fx") == 0;
         st = postJson(freePlan ? "https://api-free.deepl.com/v2/translate" : "https://api.deepl.com/v2/translate",
-                      "Authorization: DeepL-Auth-Key " + g_set.deeplKey, buildDeepLBody(texts));
+                      "Authorization: DeepL-Auth-Key " + g_set.deeplKey,
+                      buildDeepLBody(texts, g_set.targetLang));
     } else {
         st = postJson("https://translation.googleapis.com/language/translate/v2",
-                      "X-Goog-Api-Key: " + g_set.googleKey, buildGoogleTranslateBody(texts));
+                      "X-Goog-Api-Key: " + g_set.googleKey,
+                      buildGoogleTranslateBody(texts, g_set.targetLang));
     }
     if (st == -1) return 2;
     if (st < 200 || st >= 300) {
-        char b[64]; snprintf(b, sizeof(b), st == 0 ? "Translate: no connection" : "Translate: HTTP %d", st);
-        err = b; return 1;
+        if (st == 0) err = "Translate: network error - " + curlFailureText();
+        else err = "Translate: HTTP " + std::to_string(st);
+        return 1;
     }
-    const bool ok = g_set.useDeepL ? parseDeepL(g_resp, out) : parseGoogleTranslate(g_resp, out);
+    const bool ok = g_set.translateProvider == TranslateProvider::DeepL
+        ? parseDeepL(g_resp, out) : parseGoogleTranslate(g_resp, out);
     if (!ok || out.size() != texts.size()) { err = "Translate: bad answer"; return 1; }
     for (auto& t : out) if (t.empty()) { err = "Translate: empty text"; return 1; }
     return 0;
