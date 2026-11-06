@@ -478,8 +478,9 @@ void worker(void*) {
             setStatus("Reading screen...");
             std::vector<Word> words; std::string err;
             int rc = 1;
+            bool retryable = true;
             for (int attempt = 0; attempt <= kMaxRetries; ++attempt) {
-                bool retryable = true;
+                retryable = true;
                 rc = runOcr(words, err, retryable);
                 if (rc != 1 || !retryable || attempt == kMaxRetries) break;
                 char retryStatus[64];
@@ -491,6 +492,7 @@ void worker(void*) {
             if (rc == 1) {
                 wipeFrame();
                 setStatus("%s", err.c_str());
+                if (!retryable) break; // invalid key, permission error or rate limit: stop contacting this provider
                 memcpy(thumbOcr, thumbNow, sizeof(thumbNow)); haveOcr = true;
                 continue;
             }
@@ -517,8 +519,9 @@ void worker(void*) {
                 setStatus("Translating...");
                 std::vector<std::string> tr;
                 rc = 1;
+                bool retryable = true;
                 for (int attempt = 0; attempt <= kMaxRetries; ++attempt) {
-                    bool retryable = true;
+                    retryable = true;
                     rc = runTranslate(missing, tr, err, retryable);
                     if (rc != 1 || !retryable || attempt == kMaxRetries) break;
                     char retryStatus[64];
@@ -535,6 +538,7 @@ void worker(void*) {
                             cacheAdd(missingHash[i], tr[i]);
                     }
                     setStatus("%s", err.c_str());
+                    if (!retryable) break; // invalid key, permission error or rate limit: stop contacting this provider
                     memcpy(thumbOcr, thumbNow, sizeof(thumbNow)); haveOcr = true;
                     continue;
                 }
