@@ -239,7 +239,7 @@ std::string urlEncode(const std::string& input) {
     return out;
 }
 
-int getMyMemory(const std::string& text, std::string& translated) {
+int getMyMemory(const std::string& text, std::string& translated, std::string& err) {}
     std::string lang = g_set.targetLang.empty() ? "en" : g_set.targetLang;
     std::string url = "https://api.mymemory.translated.net/get?q=" + urlEncode(text) +
                       "&langpair=ja%7C" + urlEncode(lang);
@@ -255,7 +255,10 @@ int getMyMemory(const std::string& text, std::string& translated) {
     else if (cJSON_IsString(apiStatus) && apiStatus->valuestring)
         providerStatus = (int)strtol(apiStatus->valuestring, nullptr, 10);
     if (providerStatus != 200) {
-                cJSON_Delete(root);
+        const cJSON* details = cJSON_GetObjectItemCaseSensitive(root, "responseDetails");
+        err = cJSON_IsString(details) && details->valuestring
+            ? details->valuestring : "MyMemory provider error";
+        cJSON_Delete(root);
         return providerStatus > 0 ? providerStatus : 502;
     }
     const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "responseData");
@@ -436,13 +439,14 @@ int runTranslate(const std::vector<std::string>& texts, std::vector<std::string>
         for (size_t i = out.size(); i < texts.size(); ++i) {
             if (g_abort.load(std::memory_order_acquire)) return 2;
             std::string translated;
-            const int st = getMyMemory(texts[i], translated);
+            const int st = getMyMemory(texts[i], translated, err);
             if (st == -1) return 2;
             if (st < 200 || st >= 300) {
                 retryable = retryableHttp(st);
-                err = st == 0 ? "Translate: network error - " + curlFailureText()
-                    : (st == 429 ? "Translate: MyMemory HTTP 429 - rate limit or quota reached"
-                                 : "Translate: MyMemory HTTP " + std::to_string(st));
+                if (st == 0) err = "Translate: network error - " + curlFailureText();
+                else if (st == 429) err = "Translate: MyMemory HTTP 429 - rate limit or quota reached";
+                else if (st < 200 || st >= 300)
+                    err = "Translate: MyMemory HTTP " + std::to_string(st) + (err.empty() ? "" : " - " + err);
                 return 1;
             }
             if (translated.empty()) { err = "Translate: MyMemory returned empty text"; return 1; }
