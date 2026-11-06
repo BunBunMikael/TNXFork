@@ -424,6 +424,7 @@ int runOcr(std::vector<Word>& words, std::string& err, bool& retryable) {
 }
 
 int runTranslate(const std::vector<std::string>& texts, std::vector<std::string>& out, std::string& err, bool& retryable) {
+    err.clear();
     retryable = true;
     if (g_set.translateProvider == TranslateProvider::DeepL && g_set.deeplKey.empty()) {
         err = "Translate: DeepL API key is missing"; retryable = false; return 1;
