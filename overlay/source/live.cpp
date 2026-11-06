@@ -499,7 +499,8 @@ void worker(void*) {
 
             std::vector<Block> blocks = groupBlocks(std::move(words), kMaxPatches, kTextMax - 1);
             if (blocks.empty()) {
-                setPatches({}); setStatus("No Japanese text");
+                setPatches({});
+                setStatus(ocrKeyAccepted ? "No Japanese text | OCR key OK" : "No Japanese text");
                 memcpy(thumbOcr, thumbNow, sizeof(thumbNow)); haveOcr = true;
                 continue;
             }
