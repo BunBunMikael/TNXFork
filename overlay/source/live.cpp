@@ -528,6 +528,12 @@ void worker(void*) {
                 }
                 if (rc == 2) break;
                 if (rc == 1) {
+                    // Keep successful MyMemory lines so a later retry does not spend
+                    // quota requesting them again after one line failed.
+                    if (g_set.translateProvider == TranslateProvider::MyMemory) {
+                        for (size_t i = 0; i < tr.size() && i < missingHash.size(); ++i)
+                            cacheAdd(missingHash[i], tr[i]);
+                    }
                     setStatus("%s", err.c_str());
                     memcpy(thumbOcr, thumbNow, sizeof(thumbNow)); haveOcr = true;
                     continue;
