@@ -363,7 +363,7 @@ void wipeFrame() { if (g_jpeg) memset(g_jpeg, 0, kJpegCap); g_jpegLen = 0; }
 // ─── pipeline steps ───────────────────────────────────────────────────────
 // 0 ok, 1 api error (backoff), 2 cancelled
 bool retryableHttp(int status) {
-    return status == 0 || status == 408 || status == 425 || status == 429 || status >= 500;
+    return status == 0 || status == 408 || status == 425 || (status >= 500 && status < 600);
 }
 
 // 0 = success, 1 = API error (retryable out-param), 2 = cancelled.
@@ -489,7 +489,7 @@ void worker(void*) {
                 memcpy(thumbOcr, thumbNow, sizeof(thumbNow)); haveOcr = true;
                 continue;
             }
-            ocrKeyAccepted = true;
+            ocrKeyAccepted = g_set.useVision ? !g_set.visionKey.empty() : !g_set.ocrSpaceKey.empty();
             wipeFrame();    // the picture is no longer needed once the OCR answer is in
 
             std::vector<Block> blocks = groupBlocks(std::move(words), kMaxPatches, kTextMax - 1);
@@ -526,7 +526,9 @@ void worker(void*) {
                     memcpy(thumbOcr, thumbNow, sizeof(thumbNow)); haveOcr = true;
                     continue;
                 }
-                translationKeyAccepted = g_set.translateProvider != TranslateProvider::MyMemory;
+                translationKeyAccepted = g_set.translateProvider == TranslateProvider::DeepL
+                    ? !g_set.deeplKey.empty()
+                    : (g_set.translateProvider == TranslateProvider::GoogleCloud && !g_set.googleKey.empty());
                 for (size_t i = 0; i < tr.size(); ++i) cacheAdd(missingHash[i], tr[i]);
             }
 
