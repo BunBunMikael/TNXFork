@@ -47,6 +47,13 @@ ROMFS		:=
 APP_TITLE   := TranslateNX
 APP_AUTHOR  := SertAy
 
+# Keep the repository's full UI/assets intact, but build a lean settings NRO by default.
+# Use "make NRO_MINIMAL=0" to build the original Help/Contact UI with embedded images.
+NRO_MINIMAL ?= 1
+ifeq ($(NRO_MINIMAL),1)
+DEFINES += -DTRANSLATENX_MINIMAL_NRO
+endif
+
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
@@ -89,6 +96,9 @@ export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
 CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
+ifeq ($(NRO_MINIMAL),1)
+CPPFILES := $(filter-out help_texts.cpp,$(CPPFILES))
+endif
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 
