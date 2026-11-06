@@ -368,6 +368,8 @@ bool retryableHttp(int status) {
 
 // 0 = success, 1 = API error (retryable out-param), 2 = cancelled.
 int runOcr(std::vector<Word>& words, std::string& err, bool& retryable) {
+    words.clear();
+    err.clear();
     retryable = true;
     if (g_set.useVision && g_set.visionKey.empty()) {
         err = "OCR: Google Vision API key is missing";
@@ -400,10 +402,12 @@ int runTranslate(const std::vector<std::string>& texts, std::vector<std::string>
     if (g_set.translateProvider == TranslateProvider::MyMemory) {
         // MyMemory accepts one short query per request; keeping each OCR block separate
         // preserves the HUD's one-translation-per-patch layout.
-        for (const auto& text : texts) {
+        // Preserve completed lines across retries so a transient failure does not
+        // resend successful MyMemory requests and consume quota unnecessarily.
+        for (size_t i = out.size(); i < texts.size(); ++i) {
             if (g_abort.load(std::memory_order_acquire)) return 2;
             std::string translated;
-            const int st = getMyMemory(text, translated);
+            const int st = getMyMemory(texts[i], translated);
             if (st == -1) return 2;
             if (st < 200 || st >= 300) {
                 retryable = retryableHttp(st);
@@ -437,6 +441,7 @@ int runTranslate(const std::vector<std::string>& texts, std::vector<std::string>
         else err = "Translate: HTTP " + std::to_string(st);
         return 1;
     }
+    out.clear();
     const bool ok = g_set.translateProvider == TranslateProvider::DeepL
         ? parseDeepL(g_resp, out) : parseGoogleTranslate(g_resp, out);
     if (!ok || out.size() != texts.size()) { err = "Translate: bad answer"; retryable = true; return 1; }
