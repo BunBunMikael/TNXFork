@@ -364,7 +364,21 @@ void wipeFrame() { if (g_jpeg) memset(g_jpeg, 0, kJpegCap); g_jpegLen = 0; }
 // ─── pipeline steps ───────────────────────────────────────────────────────
 // 0 ok, 1 api error (backoff), 2 cancelled
 bool retryableHttp(int status) {
+    // 429 is deliberately excluded: do not retry rate limits or quota exhaustion.
     return status == 0 || status == 408 || status == 425 || (status >= 500 && status < 600);
+}
+
+bool permanentProviderError(const std::string& message) {
+    std::string lower = message;
+    for (char& c : lower) c = (char)std::tolower((unsigned char)c);
+    static const char* terms[] = {
+        "invalid api key", "api key", "unauthorized", "forbidden",
+        "permission denied", "access denied", "quota", "rate limit",
+        "billing", "daily limit", "monthly limit"
+    };
+    for (const char* term : terms)
+        if (lower.find(term) != std::string::npos) return true;
+    return false;
 }
 
 // 0 = success, 1 = API error (retryable out-param), 2 = cancelled.
@@ -382,13 +396,18 @@ int runOcr(std::vector<Word>& words, std::string& err, bool& retryable) {
     if (st < 200 || st >= 300) {
         retryable = retryableHttp(st);
         if (st == 0) err = "OCR: network error - " + curlFailureText();
+        else if (st == 429) err = "OCR: HTTP 429 - provider rate limit or quota reached";
         else if (st == 401 || st == 403) err = "OCR: API key rejected or provider access denied (HTTP " + std::to_string(st) + ")";
         else err = "OCR: HTTP " + std::to_string(st);
         return 1;
     }
     const bool ok = g_set.useVision ? parseVisionWords(g_resp, words, err)
                                     : parseOcrSpaceWords(g_resp, words, err);
-    if (!ok) { err = "OCR: " + err; retryable = true; return 1; }
+    if (!ok) {
+        retryable = !permanentProviderError(err);
+        err = "OCR: " + err;
+        return 1;
+    }
     return 0;
 }
 
@@ -413,7 +432,8 @@ int runTranslate(const std::vector<std::string>& texts, std::vector<std::string>
             if (st < 200 || st >= 300) {
                 retryable = retryableHttp(st);
                 err = st == 0 ? "Translate: network error - " + curlFailureText()
-                              : "Translate: MyMemory HTTP " + std::to_string(st);
+                    : (st == 429 ? "Translate: MyMemory HTTP 429 - rate limit or quota reached"
+                                 : "Translate: MyMemory HTTP " + std::to_string(st));
                 return 1;
             }
             if (translated.empty()) { err = "Translate: MyMemory returned empty text"; return 1; }
@@ -438,6 +458,7 @@ int runTranslate(const std::vector<std::string>& texts, std::vector<std::string>
     if (st < 200 || st >= 300) {
         retryable = retryableHttp(st);
         if (st == 0) err = "Translate: network error - " + curlFailureText();
+        else if (st == 429) err = "Translate: HTTP 429 - provider rate limit or quota reached";
         else if (st == 401 || st == 403) err = "Translate: API key rejected or provider access denied (HTTP " + std::to_string(st) + ")";
         else err = "Translate: HTTP " + std::to_string(st);
         return 1;
@@ -454,7 +475,6 @@ int runTranslate(const std::vector<std::string>& texts, std::vector<std::string>
 void worker(void*) {
     static uint8_t thumbNow[kThumbW * kThumbH], thumbPrev[kThumbW * kThumbH], thumbOcr[kThumbW * kThumbH];
     bool havePrev = false, haveOcr = false;
-    bool ocrKeyAccepted = false, translationKeyAccepted = false;
     int unstable = 0;
 
     if (R_FAILED(capsscInitialize())) { setStatus("Capture service unavailable"); sleepFor(~0ULL >> 1); }
@@ -498,13 +518,12 @@ void worker(void*) {
                 wait = kErrorCooldownNs;
                 continue;
             }
-            ocrKeyAccepted = g_set.useVision ? !g_set.visionKey.empty() : !g_set.ocrSpaceKey.empty();
             wipeFrame();    // the picture is no longer needed once the OCR answer is in
 
             std::vector<Block> blocks = groupBlocks(std::move(words), kMaxPatches, kTextMax - 1);
             if (blocks.empty()) {
                 setPatches({});
-                setStatus(ocrKeyAccepted ? "No Japanese text | OCR key OK" : "No Japanese text");
+                setStatus("No Japanese text detected");
                 memcpy(thumbOcr, thumbNow, sizeof(thumbNow)); haveOcr = true;
                 continue;
             }
@@ -545,9 +564,6 @@ void worker(void*) {
                     wait = kErrorCooldownNs;
                     continue;
                 }
-                translationKeyAccepted = g_set.translateProvider == TranslateProvider::DeepL
-                    ? !g_set.deeplKey.empty()
-                    : (g_set.translateProvider == TranslateProvider::GoogleCloud && !g_set.googleKey.empty());
                 for (size_t i = 0; i < tr.size(); ++i) cacheAdd(missingHash[i], tr[i]);
             }
 
@@ -569,10 +585,7 @@ void worker(void*) {
             }
             if (g_abort.load(std::memory_order_acquire)) break;   // never publish after a close request
             setPatches(patches);
-            std::string liveStatus = "Live";
-            if (ocrKeyAccepted) liveStatus += " | OCR OK";
-            if (translationKeyAccepted) liveStatus += " | translation key OK";
-            setStatus("%s", liveStatus.c_str());
+            setStatus("Live");
             memcpy(thumbOcr, thumbNow, sizeof(thumbNow)); haveOcr = true;
         }
     }
