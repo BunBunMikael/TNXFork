@@ -8,14 +8,21 @@
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
 #include "config.hpp"
+#ifndef TRANSLATENX_MINIMAL_NRO
 #include "logo_data.h"
 #include "qr_data.h"
 #include "help_texts.h"
+#endif
 
 // -------------------------------------------------------
 // DIL KODLARI & ISIMLERI (UTF-8)
 // -------------------------------------------------------
 static const int  NUM_LANGS  = 2;
+#ifdef TRANSLATENX_MINIMAL_NRO
+static const int  NUM_TABS   = 2;
+#else
+static const int  NUM_TABS   = 4;
+#endif
 static const char* LC[]      = {
     "TR","EN"
 };
@@ -48,10 +55,12 @@ static void initT() {
               {"emp",u8"(Empty) - press [A] to edit"},{"uil",u8"UI Language"},
               {"ft",u8"[A] Select   [L/R] Menu Tab   [Up/Down] Scroll   [+] Exit"}};
 
+#ifndef TRANSLATENX_MINIMAL_NRO
     initHelpTexts();
     for (auto& pair : HELP_TEXTS) {
         T[pair.first]["hlp"] = pair.second;
     }
+#endif
 }
 
 static const char* Tr(const char* k, const std::string& lang) {
@@ -145,6 +154,7 @@ int main(int argc, char* argv[]) {
     int uiIdx=1;
     for(int i=0;i<NUM_LANGS;i++) if(cfg.uiLang==LC[i]){uiIdx=i;break;}
 
+#ifndef TRANSLATENX_MINIMAL_NRO
     SDL_Surface* lsurf=SDL_CreateRGBSurfaceWithFormatFrom(
         (void*)logo_pixels,logo_width,logo_height,32,logo_width*4,SDL_PIXELFORMAT_RGBA32);
     SDL_Texture* logoTex=nullptr;
@@ -154,6 +164,7 @@ int main(int argc, char* argv[]) {
         (void*)qr_pixels,qr_width,qr_height,32,qr_width*4,SDL_PIXELFORMAT_RGBA32);
     SDL_Texture* qrTex=nullptr;
     if(qrsurf){qrTex=SDL_CreateTextureFromSurface(ren,qrsurf);SDL_FreeSurface(qrsurf);}
+#endif
 
 
     const float W=1280,H=720;
@@ -190,10 +201,10 @@ int main(int argc, char* argv[]) {
                 int btn=ev.cbutton.button;
                 if(btn==SDL_CONTROLLER_BUTTON_START) done=true;
                 if(btn==SDL_CONTROLLER_BUTTON_LEFTSHOULDER){
-                    tab=(tab-1+4)%4; focus=0;
+                    tab=(tab-1+NUM_TABS)%NUM_TABS; focus=0;
                 }
                 if(btn==SDL_CONTROLLER_BUTTON_RIGHTSHOULDER){
-                    tab=(tab+1)%4; focus=0;
+                    tab=(tab+1)%NUM_TABS; focus=0;
                 }
                 if(btn==SDL_CONTROLLER_BUTTON_DPAD_UP){
                     if(tab != 2 && tab != 3) { focus--; if(focus<0) focus=itemCount()-1; last_focus_move = SDL_GetTicks(); }
@@ -287,13 +298,22 @@ int main(int argc, char* argv[]) {
             dl->AddRectFilled({0,0},{SBW,H},IM_COL32(10,10,14,255));
             dl->AddLine({SBW,0},{SBW,H},IM_COL32(30,30,44,255),1.5f);
 
-            float lw=220, lh=lw*((float)logo_height/logo_width);
-            float lx=(SBW-lw)/2.0f, ly=24;
+            float ly=24.0f;
+            float lh=0.0f;
+#ifndef TRANSLATENX_MINIMAL_NRO
+            float lw=220.0f;
+            lh=lw*((float)logo_height/logo_width);
+            float lx=(SBW-lw)/2.0f;
             if(logoTex) dl->AddImage((ImTextureID)logoTex,{lx,ly},{lx+lw,ly+lh});
+#endif
 
+#ifdef TRANSLATENX_MINIMAL_NRO
+            const char* tnames[]={Tr("k0",cfg.uiLang),Tr("k1",cfg.uiLang)};
+#else
             const char* tnames[]={Tr("k0",cfg.uiLang),Tr("k1",cfg.uiLang),Tr("k2",cfg.uiLang),Tr("k3",cfg.uiLang)};
+#endif
             float ty=ly+lh+24;
-            for(int i=0;i<4;i++){
+            for(int i=0;i<NUM_TABS;i++){
                 float tx=10,tw=SBW-20,th=42;
                 if(tab==i) dl->AddRectFilled({tx,ty},{tx+tw,ty+th},IM_COL32(35,82,168,255),6.f);
                 ImU32 tc=(tab==i)?IM_COL32(255,255,255,255):IM_COL32(125,125,145,255);
@@ -438,6 +458,7 @@ int main(int argc, char* argv[]) {
             ImGui::EndChild();
         }
 
+#ifndef TRANSLATENX_MINIMAL_NRO
         else if(tab==2) {
             ImGui::TextColored({0.85f,0.85f,1.0f,1},"  %s",Tr("k2",cfg.uiLang));
             ImGui::SetCursorPosX(cx);
@@ -538,6 +559,7 @@ int main(int argc, char* argv[]) {
             
             ImGui::EndChild();
         }
+#endif
 
         ImGui::EndGroup();
 
@@ -561,8 +583,10 @@ int main(int argc, char* argv[]) {
         SDL_RenderPresent(ren);
     }
 
+#ifndef TRANSLATENX_MINIMAL_NRO
     if(logoTex) SDL_DestroyTexture(logoTex);
     if(qrTex) SDL_DestroyTexture(qrTex);
+#endif
     ImGui_ImplSDLRenderer2_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
