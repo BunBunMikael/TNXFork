@@ -1,0 +1,22 @@
+            "url": "https://github.com/sertay1/TranslateNX/releases/download/V1.0.0/TranslateNX_1.0.0.zip",
+            "type": "update",
+            "dest": "/switch/TranslateNX/TranslateNX.nro"
+        },
+        {
+            "type": "screenshot",
+            "url": "1.png"
+        },
+        {
+            "type": "screenshot",
+            "url": "2.png"
+        },
+        {
+            "type": "screenshot",
+            "url": "3.png"
+        },
+        {
+            "type": "screenshot",
+            "url": "4.png"
+        }
+    ],
+    "changelog": ""

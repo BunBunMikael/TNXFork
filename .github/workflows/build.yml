@@ -1,0 +1,40 @@
+name: Build TranslateNX Live
+
+# Put this file in your repo at:  .github/workflows/build.yml
+# Run it from the Actions tab ("Run workflow") or by pushing to the repo.
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Switch libraries
+        run: |
+          dkp-pacman -Syu --noconfirm
+          dkp-pacman -S --needed --noconfirm switch-dev switch-curl switch-mbedtls switch-zlib switch-libjpeg-turbo
+
+      - name: Build TranslateNX Live (make HUD=1)
+        working-directory: overlay
+        run: make HUD=1 -j"$(nproc)"
+
+      - name: Upload translatenx_live.ovl
+        uses: actions/upload-artifact@v4
+        with:
+          name: translatenx-live-ovl
+          path: overlay/translatenx_live.ovl
+          if-no-files-found: error
+
+      # To also build the original menu overlay, add a step like this and a second
+      # upload-artifact step for overlay/translatenx.ovl:
+      #
+      # - name: Build original overlay
+      #   working-directory: overlay
+      #   run: make -j"$(nproc)"
