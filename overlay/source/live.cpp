@@ -22,6 +22,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
+#include <cctype>
 #include <string>
 #include <sys/stat.h>
 #include <vector>
