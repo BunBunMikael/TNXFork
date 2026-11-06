@@ -203,6 +203,7 @@ inline std::string s_lastFocusedItemText; // tracks the text of whatever focusab
 
 inline std::atomic<bool> mainComboHasTriggered{false};
 inline std::atomic<bool> launchComboHasTriggered{false};
+inline std::atomic<bool> closeOnLaunchCombo{false}; // opt-in: close HUD overlays on the configured combo
 
 // Opt-in (set by the host overlay, e.g. Status Monitor): when true, pressing the
 // mode-combo of the mode you are CURRENTLY in returns to that overlay's OWN main
@@ -14740,6 +14741,11 @@ namespace tsl {
                         #if IS_STATUS_MONITOR_DIRECTIVE
                                 }
                         #endif
+                            } else if (closeOnLaunchCombo.load(std::memory_order_acquire)) {
+                                // HUD overlays may release foreground to the game, but still need
+                                // their configured combo to close the overlay and stop workers.
+                                tsl::setNextOverlay(returnOverlayPath);
+                                launchComboHasTriggered.store(true, std::memory_order_release);
                             }
                         }
                         else {
