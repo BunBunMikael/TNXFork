@@ -1125,23 +1125,25 @@ public:
     tsl::elm::Element* createUI() override {
         auto* drawer = new tsl::elm::CustomDrawer([this](tsl::gfx::Renderer* r, s32, s32, s32, s32) {
             r->clearScreen();
-            r->drawRect(52, 42, 536, 276, tsl::Color(0, 0, 0, 14));
-            r->drawRect(56, 46, 528, 268, tsl::Color(2, 2, 2, 14));
-            r->drawString("TranslateNX Live", false, 76, 78, 18, tsl::Color(15, 15, 15, 15));
-            r->drawString("Select providers and start the translation HUD", false, 76, 101, 10, tsl::Color(11, 11, 11, 15));
+            // Compact portrait-style panel: the HUD stays at 640x360, while
+            // setup controls occupy about the same screen footprint as Ultrahand.
+            r->drawRect(185, 24, 270, 312, tsl::Color(0, 0, 0, 14));
+            r->drawRect(189, 28, 262, 304, tsl::Color(2, 2, 2, 14));
+            r->drawString("TranslateNX", false, 207, 59, 16, tsl::Color(15, 15, 15, 15));
+            r->drawString("LIVE HUD SETUP", false, 207, 79, 9, tsl::Color(11, 11, 11, 15));
 
             const char* labels[] = {"OCR provider", "Translation provider", "Start live translation"};
             const char* values[] = {ocrName(), translateName(), "A"};
             for (int i = 0; i < 3; ++i) {
-                const int y = 124 + i * 42;
+                const int y = 119 + i * 55;
                 if (i == m_selected)
-                    r->drawRect(70, y - 19, 500, 34, tsl::Color(5, 7, 10, 15));
-                r->drawString(labels[i], false, 84, y, 12,
+                    r->drawRect(199, y - 20, 242, 44, tsl::Color(5, 7, 10, 15));
+                r->drawString(labels[i], false, 207, y - 3, 10,
                     i == m_selected ? tsl::Color(15, 15, 15, 15) : tsl::Color(12, 12, 12, 15));
-                r->drawString(values[i], false, 420, y, 12, tsl::Color(12, 14, 15, 15));
+                r->drawString(values[i], false, 207, y + 12, 9, tsl::Color(12, 14, 15, 15));
             }
-            r->drawString(m_status, false, 76, 267, 10, tsl::Color(13, 13, 9, 15));
-            r->drawString("UP/DOWN Navigate    A Select    B Close", false, 76, 294, 9, tsl::Color(10, 10, 10, 15));
+            r->drawString(m_status, false, 207, 285, 8, tsl::Color(13, 13, 9, 15));
+            r->drawString("UP/DOWN  A  B", false, 207, 312, 8, tsl::Color(10, 10, 10, 15));
         });
         drawer->setBoundaries(0, 0, 640, 360);
         return drawer;
