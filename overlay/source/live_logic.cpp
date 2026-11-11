@@ -209,23 +209,30 @@ static std::string printAndFree(cJSON* root) {
     return r;
 }
 
-std::string buildDeepLBody(const std::vector<std::string>& texts) {
+std::string buildDeepLBody(const std::vector<std::string>& texts, const std::string& targetLang) {
     cJSON* root = cJSON_CreateObject();
     cJSON* arr = cJSON_CreateArray();
     for (auto& t : texts) cJSON_AddItemToArray(arr, cJSON_CreateString(t.c_str()));
     cJSON_AddItemToObject(root, "text", arr);
     cJSON_AddStringToObject(root, "source_lang", "JA");
-    cJSON_AddStringToObject(root, "target_lang", "EN-US");
+    std::string target = targetLang.empty() ? "EN" : targetLang;
+    std::transform(target.begin(), target.end(), target.begin(),
+                   [](unsigned char c) { return (char)std::toupper(c); });
+    if (target == "EN") target = "EN-US";
+    cJSON_AddStringToObject(root, "target_lang", target.c_str());
     return printAndFree(root);
 }
 
-std::string buildGoogleTranslateBody(const std::vector<std::string>& texts) {
+std::string buildGoogleTranslateBody(const std::vector<std::string>& texts, const std::string& targetLang) {
     cJSON* root = cJSON_CreateObject();
     cJSON* arr = cJSON_CreateArray();
     for (auto& t : texts) cJSON_AddItemToArray(arr, cJSON_CreateString(t.c_str()));
     cJSON_AddItemToObject(root, "q", arr);
     cJSON_AddStringToObject(root, "source", "ja");
-    cJSON_AddStringToObject(root, "target", "en");
+    std::string target = targetLang.empty() ? "en" : targetLang;
+    std::transform(target.begin(), target.end(), target.begin(),
+                   [](unsigned char c) { return (char)std::tolower(c); });
+    cJSON_AddStringToObject(root, "target", target.c_str());
     cJSON_AddStringToObject(root, "format", "text");
     return printAndFree(root);
 }

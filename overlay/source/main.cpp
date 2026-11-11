@@ -985,19 +985,33 @@ class TranslateHudGui : public tsl::Gui {
 
     bool startEngine() {
         Live::Settings st;
-        st.useVision  = (g_config.ocrApi == OcrApi::GoogleVision);
-        st.useDeepL   = (g_config.translateApi != TranslateApi::GoogleCloud);
-        st.debug      = g_config.liveDebug;
+        st.useVision = (g_config.ocrApi == OcrApi::GoogleVision);
+        st.translateProvider = g_config.translateApi == TranslateApi::DeepL
+            ? Live::TranslateProvider::DeepL
+            : (g_config.translateApi == TranslateApi::GoogleCloud
+                ? Live::TranslateProvider::GoogleCloud : Live::TranslateProvider::MyMemory);
+        st.targetLang = g_config.dstLang;
+        std::transform(st.targetLang.begin(), st.targetLang.end(), st.targetLang.begin(),
+                       [](unsigned char c) { return (char)std::tolower(c); });
+        st.debug = g_config.liveDebug;
         st.ocrSpaceKey = g_config.ocrApiKey;
-        st.visionKey   = g_config.visionApiKey;
-        st.deeplKey    = g_config.deeplApiKey;
-        st.googleKey   = g_config.googleTransApiKey;
+        st.visionKey = g_config.visionApiKey;
+        st.deeplKey = g_config.deeplApiKey;
+        st.googleKey = g_config.googleTransApiKey;
 
-        if (g_config.translateApi == TranslateApi::MyMemory) { m_setupError = "config.ini: set translate_api=deepl or googlecloud"; return false; }
-        if (st.useVision && st.visionKey.empty())            { m_setupError = "config.ini: vision_api_key is empty"; return false; }
-        if (g_config.translateApi == TranslateApi::DeepL && st.deeplKey.empty())        { m_setupError = "config.ini: deepl_api_key is empty"; return false; }
-        if (g_config.translateApi == TranslateApi::GoogleCloud && st.googleKey.empty()) { m_setupError = "config.ini: google_trans_api_key is empty"; return false; }
-        if (!Live::start(st)) { m_setupError = "could not start (out of memory?)"; return false; }
+        if (st.useVision && st.visionKey.empty()) {
+            m_setupError = "Google Vision API key is missing";
+            return false;
+        }
+        if (st.translateProvider == Live::TranslateProvider::DeepL && st.deeplKey.empty()) {
+            m_setupError = "DeepL API key is missing";
+            return false;
+        }
+        if (st.translateProvider == Live::TranslateProvider::GoogleCloud && st.googleKey.empty()) {
+            m_setupError = "Google Cloud API key is missing";
+            return false;
+        }
+        if (!Live::start(st)) { m_setupError = "Could not start live translation (memory/thread error)"; return false; }
         return true;
     }
 
@@ -1099,6 +1113,87 @@ public:
         return false;
     }
 };
+
+
+class TranslateHudSetupGui : public tsl::Gui {
+    tsl::elm::ListItem* m_ocrItem = nullptr;
+    tsl::elm::ListItem* m_translateItem = nullptr;
+    tsl::elm::ListItem* m_statusItem = nullptr;
+
+    void update() override {
+        if (m_ocrItem) {
+            m_ocrItem->setValue(g_config.ocrApi == OcrApi::GoogleVision ? "Google Vision" : "OCR.space");
+        }
+        if (m_translateItem) {
+            const char* value = g_config.translateApi == TranslateApi::DeepL ? "DeepL" :
+                (g_config.translateApi == TranslateApi::GoogleCloud ? "Google Cloud" : "MyMemory");
+            m_translateItem->setValue(value);
+        }
+    }
+
+    void startLive() {
+        if (g_config.ocrApi == OcrApi::GoogleVision && g_config.visionApiKey.empty()) {
+            m_statusItem->setValue("Missing Google Vision key (set it in the NRO)");
+            return;
+        }
+        if (g_config.translateApi == TranslateApi::DeepL && g_config.deeplApiKey.empty()) {
+            m_statusItem->setValue("Missing DeepL key (set it in the NRO)");
+            return;
+        }
+        if (g_config.translateApi == TranslateApi::GoogleCloud && g_config.googleTransApiKey.empty()) {
+            m_statusItem->setValue("Missing Google Cloud key (set it in the NRO)");
+            return;
+        }
+        m_statusItem->setValue("Starting live translation...");
+        tsl::changeTo<TranslateHudGui>();
+    }
+
+public:
+    tsl::elm::Element* createUI() override {
+        auto* frame = new tsl::elm::OverlayFrame("TranslateNX Live", "Choose providers, then start");
+        auto* list = new tsl::elm::List();
+
+        list->addItem(new tsl::elm::CategoryHeader("OCR PROVIDER"));
+        m_ocrItem = new tsl::elm::ListItem("OCR API");
+        m_ocrItem->setClickListener([](u64 keys) -> bool {
+            if (keys & HidNpadButton_A) {
+                tsl::changeTo<OcrApiSelectGui>();
+                return true;
+            }
+            return false;
+        });
+        list->addItem(m_ocrItem);
+
+        list->addItem(new tsl::elm::CategoryHeader("TRANSLATION PROVIDER"));
+        m_translateItem = new tsl::elm::ListItem("Translation API");
+        m_translateItem->setClickListener([](u64 keys) -> bool {
+            if (keys & HidNpadButton_A) {
+                tsl::changeTo<TranslateApiSelectGui>();
+                return true;
+            }
+            return false;
+        });
+        list->addItem(m_translateItem);
+
+        auto* startItem = new tsl::elm::ListItem("Start live translation");
+        startItem->setClickListener([this](u64 keys) -> bool {
+            if (keys & HidNpadButton_A) {
+                startLive();
+                return true;
+            }
+            return false;
+        });
+        list->addItem(startItem);
+
+        m_statusItem = new tsl::elm::ListItem("Status");
+        m_statusItem->setValue("Ready");
+        list->addItem(m_statusItem);
+
+        frame->setContent(list);
+        return frame;
+    }
+};
+
 #endif // TNX_HUD
 
 class TranslateOverlay : public tsl::Overlay {
@@ -1124,7 +1219,7 @@ public:
         ult::useHapticFeedback = false; // Titreşimi tamamen kapat
 
 #ifdef TNX_HUD
-        return initially<TranslateHudGui>();
+        return initially<TranslateHudSetupGui>();
 #else
         return initially<TranslateGui>();
 #endif
